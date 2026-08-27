@@ -107,7 +107,7 @@ button, input {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -202,4 +202,91 @@ output {
     border-left: 1px solid #333;
     border-right: 1px solid #333;
   }
+}
+
+
+.light-section {
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #333;
+}
+
+.light-section:last-child {
+  border-bottom: 0;
+}
+
+.light-section h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.panel label.color-row {
+  grid-template-columns: 1fr auto;
+}
+
+.color-row input[type="color"] {
+  width: 56px;
+  height: 38px;
+  padding: 2px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  background: #222;
+}
+
+.direction-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 7px;
+  font-size: 14px;
+}
+
+.direction-heading output {
+  font-size: 12px;
+}
+
+.direction-pad {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  border: 1px solid #555;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #222;
+  touch-action: none;
+}
+
+.direction-cross {
+  position: absolute;
+  background: #444;
+  pointer-events: none;
+}
+
+.direction-cross.horizontal {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+.direction-cross.vertical {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.direction-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f1f1f1;
+  border: 3px solid #111;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
