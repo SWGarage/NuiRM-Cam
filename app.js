@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const video = document.querySelector('#cameraVideo');
@@ -13,6 +16,17 @@ const resetButton = document.querySelector('#resetButton');
 const captureCanvas = document.querySelector('#captureCanvas');
 const expressionList = document.querySelector('#expressionList');
 const mirrorButton = document.querySelector('#mirrorPose');
+const keyLightColorInput = document.querySelector('#keyLightColor');
+const keyLightIntensityInput = document.querySelector('#keyLightIntensity');
+const keyLightIntensityOut = document.querySelector('#keyLightIntensityOut');
+const ambientLightColorInput = document.querySelector('#ambientLightColor');
+const ambientLightIntensityInput = document.querySelector('#ambientLightIntensity');
+const ambientLightIntensityOut = document.querySelector('#ambientLightIntensityOut');
+const glowStrengthInput = document.querySelector('#glowStrength');
+const glowStrengthOut = document.querySelector('#glowStrengthOut');
+const lightDirectionPad = document.querySelector('#lightDirectionPad');
+const lightDirectionDot = document.querySelector('#lightDirectionDot');
+const lightDirectionOut = document.querySelector('#lightDirectionOut');
 
 const inputs = {
   scale: document.querySelector('#scale'),
@@ -47,6 +61,18 @@ scene.add(ambientLight);
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
 keyLight.position.set(1, 1.5, 2);
 scene.add(keyLight);
+scene.add(keyLight.target);
+
+// 背景カメラはHTML <video> なので、このComposerが処理するのはVRMだけ。
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.35, 0.0);
+bloomPass.threshold = 0.0;
+bloomPass.strength = 0.3;
+bloomPass.radius = 0.35;
+composer.addPass(bloomPass);
 
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -71,6 +97,24 @@ const transform = {
   rotZ: 0,
 };
 
+const lighting = {
+  keyColor: '#ffffff',
+  keyIntensity: 2.5,
+  ambientColor: '#ffffff',
+  ambientIntensity: 1.3,
+  glowStrength: 0.3,
+  // カメラ基準。yaw=左右、pitch=上下。
+  yaw: THREE.MathUtils.degToRad(17),
+  pitch: THREE.MathUtils.degToRad(17),
+};
+
+const cameraRightAxis = new THREE.Vector3();
+const cameraUpAxis = new THREE.Vector3();
+const cameraForwardAxis = new THREE.Vector3();
+const qX = new THREE.Quaternion();
+const qY = new THREE.Quaternion();
+const qZ = new THREE.Quaternion();
+
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -81,6 +125,8 @@ function resizeRenderer() {
 
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(rect.width, rect.height, false);
+  composer.setPixelRatio(pixelRatio);
+  composer.setSize(rect.width, rect.height);
 
   camera.aspect = rect.width / rect.height;
   camera.updateProjectionMatrix();
@@ -94,11 +140,19 @@ function applyTransform() {
 
   currentVrm.scene.position.set(transform.x, transform.y + baseOffsetY, 0);
   currentVrm.scene.scale.setScalar(baseScale * transform.scale);
-  currentVrm.scene.rotation.set(
-    THREE.MathUtils.degToRad(transform.rotX),
-    THREE.MathUtils.degToRad(transform.rotY),
-    THREE.MathUtils.degToRad(transform.rotZ)
-  );
+
+  // 回転軸はアバター自身ではなくカメラ（画面）基準で固定する。
+  // Y: 画面の上方向、X: 画面の右方向、Z: カメラ正面方向。
+  cameraRightAxis.set(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+  cameraUpAxis.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+  cameraForwardAxis.set(0, 0, 1).applyQuaternion(camera.quaternion).normalize();
+
+  qY.setFromAxisAngle(cameraUpAxis, THREE.MathUtils.degToRad(transform.rotY));
+  qX.setFromAxisAngle(cameraRightAxis, THREE.MathUtils.degToRad(transform.rotX));
+  qZ.setFromAxisAngle(cameraForwardAxis, THREE.MathUtils.degToRad(transform.rotZ));
+
+  // yaw(Y) → pitch(X) → roll(Z)。各軸そのものはカメラ基準で固定。
+  currentVrm.scene.quaternion.copy(qZ).multiply(qX).multiply(qY);
 }
 
 function syncTransformUi() {
@@ -122,6 +176,50 @@ function resetTransform() {
   transform.rotZ = 0;
   syncTransformUi();
   applyTransform();
+}
+
+
+function updateLightDirection() {
+  const cp = Math.cos(lighting.pitch);
+  const direction = new THREE.Vector3(
+    Math.sin(lighting.yaw) * cp,
+    Math.sin(lighting.pitch),
+    Math.cos(lighting.yaw) * cp
+  ).normalize();
+
+  keyLight.position.copy(direction.multiplyScalar(5));
+  keyLight.target.position.set(0, 0, 0);
+  keyLight.target.updateMatrixWorld();
+
+  const yawDeg = Math.round(THREE.MathUtils.radToDeg(lighting.yaw));
+  const pitchDeg = Math.round(THREE.MathUtils.radToDeg(lighting.pitch));
+  lightDirectionOut.value = `X ${pitchDeg}° / Y ${yawDeg}°`;
+
+  const x = THREE.MathUtils.clamp((yawDeg / 90) * 50 + 50, 0, 100);
+  const y = THREE.MathUtils.clamp(50 - (pitchDeg / 90) * 50, 0, 100);
+  lightDirectionDot.style.left = `${x}%`;
+  lightDirectionDot.style.top = `${y}%`;
+}
+
+function applyLighting() {
+  keyLight.color.set(lighting.keyColor);
+  keyLight.intensity = lighting.keyIntensity;
+  ambientLight.color.set(lighting.ambientColor);
+  ambientLight.intensity = lighting.ambientIntensity;
+  bloomPass.strength = lighting.glowStrength;
+  updateLightDirection();
+}
+
+function syncLightingUi() {
+  keyLightColorInput.value = lighting.keyColor;
+  keyLightIntensityInput.value = String(lighting.keyIntensity);
+  keyLightIntensityOut.value = lighting.keyIntensity.toFixed(2);
+  ambientLightColorInput.value = lighting.ambientColor;
+  ambientLightIntensityInput.value = String(lighting.ambientIntensity);
+  ambientLightIntensityOut.value = lighting.ambientIntensity.toFixed(2);
+  glowStrengthInput.value = String(lighting.glowStrength);
+  glowStrengthOut.value = lighting.glowStrength.toFixed(2);
+  updateLightDirection();
 }
 
 async function startCamera() {
@@ -317,7 +415,7 @@ function animate() {
   const delta = clock.getDelta();
 
   if (currentVrm) currentVrm.update(delta);
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate();
 
@@ -342,6 +440,56 @@ for (const [key, input] of Object.entries(inputs)) {
     applyTransform();
   });
 }
+
+
+keyLightColorInput.addEventListener('input', () => {
+  lighting.keyColor = keyLightColorInput.value;
+  applyLighting();
+});
+
+keyLightIntensityInput.addEventListener('input', () => {
+  lighting.keyIntensity = Number(keyLightIntensityInput.value);
+  keyLightIntensityOut.value = lighting.keyIntensity.toFixed(2);
+  applyLighting();
+});
+
+ambientLightColorInput.addEventListener('input', () => {
+  lighting.ambientColor = ambientLightColorInput.value;
+  applyLighting();
+});
+
+ambientLightIntensityInput.addEventListener('input', () => {
+  lighting.ambientIntensity = Number(ambientLightIntensityInput.value);
+  ambientLightIntensityOut.value = lighting.ambientIntensity.toFixed(2);
+  applyLighting();
+});
+
+glowStrengthInput.addEventListener('input', () => {
+  lighting.glowStrength = Number(glowStrengthInput.value);
+  glowStrengthOut.value = lighting.glowStrength.toFixed(2);
+  applyLighting();
+});
+
+function setLightDirectionFromPointer(event) {
+  const rect = lightDirectionPad.getBoundingClientRect();
+  const nx = THREE.MathUtils.clamp((event.clientX - rect.left) / rect.width, 0, 1);
+  const ny = THREE.MathUtils.clamp((event.clientY - rect.top) / rect.height, 0, 1);
+
+  lighting.yaw = THREE.MathUtils.degToRad((nx * 2 - 1) * 90);
+  lighting.pitch = THREE.MathUtils.degToRad((1 - ny * 2) * 90);
+  updateLightDirection();
+}
+
+lightDirectionPad.addEventListener('pointerdown', (event) => {
+  lightDirectionPad.setPointerCapture(event.pointerId);
+  setLightDirectionFromPointer(event);
+});
+
+lightDirectionPad.addEventListener('pointermove', (event) => {
+  if (lightDirectionPad.hasPointerCapture(event.pointerId)) {
+    setLightDirectionFromPointer(event);
+  }
+});
 
 function getPointerDistance() {
   const points = [...activePointers.values()];
@@ -518,6 +666,7 @@ async function capturePhoto() {
   if (!ctx) return;
 
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
+  composer.render();
   ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
 
   const blob = await new Promise((resolve) =>
@@ -531,9 +680,15 @@ async function capturePhoto() {
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+  const now = new Date();
+  const pad2 = (value) => String(value).padStart(2, '0');
+  const stamp =
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-` +
+    `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+
   a.href = url;
-  a.download = `virtual-nuikatsu-${stamp}.jpg`;
+  a.download = `NuiRM-${stamp}.jpg`;
   a.click();
 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -544,3 +699,5 @@ const resizeObserver = new ResizeObserver(resizeRenderer);
 resizeObserver.observe(stage);
 resizeRenderer();
 syncTransformUi();
+syncLightingUi();
+applyLighting();
