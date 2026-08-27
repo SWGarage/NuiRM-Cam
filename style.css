@@ -38,7 +38,6 @@ button, input {
 }
 
 #cameraVideo,
-#glowCanvas,
 #vrmCanvas {
   position: absolute;
   inset: 0;
@@ -52,14 +51,6 @@ button, input {
   z-index: 0;
 }
 
-#glowCanvas {
-  display: block;
-  pointer-events: none;
-  z-index: 1;
-  filter: blur(10px);
-  transform: scale(1.02);
-  transform-origin: center;
-}
 
 #vrmCanvas {
   display: block;
