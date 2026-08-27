@@ -1,13 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const video = document.querySelector('#cameraVideo');
 const stage = document.querySelector('#stage');
 const canvas = document.querySelector('#vrmCanvas');
+const glowCanvas = document.querySelector('#glowCanvas');
 const statusEl = document.querySelector('#status');
 const cameraButton = document.querySelector('#cameraButton');
 const vrmFile = document.querySelector('#vrmFile');
@@ -51,6 +49,16 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+// Glow専用レンダラー。カメラvideoとは完全に独立した透明Canvasへ描画する。
+const glowRenderer = new THREE.WebGLRenderer({
+  canvas: glowCanvas,
+  alpha: true,
+  antialias: true,
+  preserveDrawingBuffer: true,
+});
+glowRenderer.setClearColor(0x000000, 0);
+glowRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 camera.position.set(0, 1.0, 5.0);
@@ -63,16 +71,6 @@ keyLight.position.set(1, 1.5, 2);
 scene.add(keyLight);
 scene.add(keyLight.target);
 
-// 背景カメラはHTML <video> なので、このComposerが処理するのはVRMだけ。
-const composer = new EffectComposer(renderer);
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
-
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.35, 0.0);
-bloomPass.threshold = 0.0;
-bloomPass.strength = 0.3;
-bloomPass.radius = 0.35;
-composer.addPass(bloomPass);
 
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -102,7 +100,7 @@ const lighting = {
   keyIntensity: 2.5,
   ambientColor: '#ffffff',
   ambientIntensity: 1.3,
-  glowStrength: 0.3,
+  glowStrength: 0.1,
   // カメラ基準。yaw=左右、pitch=上下。
   yaw: THREE.MathUtils.degToRad(17),
   pitch: THREE.MathUtils.degToRad(17),
@@ -125,8 +123,8 @@ function resizeRenderer() {
 
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(rect.width, rect.height, false);
-  composer.setPixelRatio(pixelRatio);
-  composer.setSize(rect.width, rect.height);
+  glowRenderer.setPixelRatio(pixelRatio);
+  glowRenderer.setSize(rect.width, rect.height, false);
 
   camera.aspect = rect.width / rect.height;
   camera.updateProjectionMatrix();
@@ -195,7 +193,7 @@ function updateLightDirection() {
   const pitchDeg = Math.round(THREE.MathUtils.radToDeg(lighting.pitch));
   lightDirectionOut.value = `X ${pitchDeg}° / Y ${yawDeg}°`;
 
-  const x = THREE.MathUtils.clamp((yawDeg / 90) * 50 + 50, 0, 100);
+  const x = THREE.MathUtils.clamp((yawDeg / 180) * 50 + 50, 0, 100);
   const y = THREE.MathUtils.clamp(50 - (pitchDeg / 90) * 50, 0, 100);
   lightDirectionDot.style.left = `${x}%`;
   lightDirectionDot.style.top = `${y}%`;
@@ -206,7 +204,11 @@ function applyLighting() {
   keyLight.intensity = lighting.keyIntensity;
   ambientLight.color.set(lighting.ambientColor);
   ambientLight.intensity = lighting.ambientIntensity;
-  bloomPass.strength = lighting.glowStrength;
+  // Glow Canvasの透明度・明るさだけを変更。背景videoには一切影響しない。
+  const opacity = THREE.MathUtils.clamp(lighting.glowStrength, 0, 1);
+  const brightness = 1 + Math.max(0, lighting.glowStrength - 0.5) * 1.2;
+  glowCanvas.style.opacity = String(opacity);
+  glowCanvas.style.filter = `blur(10px) brightness(${brightness})`;
   updateLightDirection();
 }
 
@@ -415,7 +417,11 @@ function animate() {
   const delta = clock.getDelta();
 
   if (currentVrm) currentVrm.update(delta);
-  composer.render();
+
+  // 通常VRMとGlow用VRMを別Canvasへ描画する。
+  // どちらも透明背景なので、その下のカメラvideoを覆わない。
+  glowRenderer.render(scene, camera);
+  renderer.render(scene, camera);
 }
 animate();
 
@@ -475,7 +481,7 @@ function setLightDirectionFromPointer(event) {
   const nx = THREE.MathUtils.clamp((event.clientX - rect.left) / rect.width, 0, 1);
   const ny = THREE.MathUtils.clamp((event.clientY - rect.top) / rect.height, 0, 1);
 
-  lighting.yaw = THREE.MathUtils.degToRad((nx * 2 - 1) * 90);
+  lighting.yaw = THREE.MathUtils.degToRad((nx * 2 - 1) * 180);
   lighting.pitch = THREE.MathUtils.degToRad((1 - ny * 2) * 90);
   updateLightDirection();
 }
@@ -666,7 +672,19 @@ async function capturePhoto() {
   if (!ctx) return;
 
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
-  composer.render();
+
+  // Glowは撮影Canvas側でもVRMだけをぼかして加算合成する。
+  if (lighting.glowStrength > 0) {
+    glowRenderer.render(scene, camera);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = THREE.MathUtils.clamp(lighting.glowStrength, 0, 1);
+    ctx.filter = `blur(${Math.round(10 * (outW / Math.max(stage.clientWidth, 1)))}px)`;
+    ctx.drawImage(glowRenderer.domElement, 0, 0, outW, outH);
+    ctx.restore();
+  }
+
+  renderer.render(scene, camera);
   ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
 
   const blob = await new Promise((resolve) =>
