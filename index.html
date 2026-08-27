@@ -35,6 +35,10 @@
     </section>
 
     <section class="toolbar" aria-label="操作パネル">
+      <div class="primary-actions">
+        <button id="captureButton" class="shutter" type="button" aria-label="撮影"></button>
+      </div>
+
       <div class="tabbar">
         <button class="tab active" data-panel="adjustPanel" type="button">調整</button>
         <button class="tab" data-panel="posePanel" type="button">ポーズ</button>
@@ -43,13 +47,13 @@
 
       <div id="adjustPanel" class="panel active">
         <label>Scale <output id="scaleOut">1.00</output>
-          <input id="scale" type="range" min="0.2" max="3" step="0.01" value="1" />
+          <input id="scale" type="range" min="0.2" max="5" step="0.01" value="1" />
         </label>
         <label>Rotate X <output id="rotXOut">0°</output>
           <input id="rotX" type="range" min="-180" max="180" step="1" value="0" />
         </label>
         <label>Rotate Y <output id="rotYOut">0°</output>
-          <input id="rotY" type="range" min="-180" max="180" step="1" value="0" />
+          <input id="rotY" type="range" min="0" max="360" step="1" value="180" />
         </label>
         <label>Rotate Z <output id="rotZOut">0°</output>
           <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" />
@@ -74,7 +78,6 @@
 
       <div class="capture-row">
         <button id="resetButton" class="button secondary" type="button">リセット</button>
-        <button id="captureButton" class="shutter" type="button" aria-label="撮影"></button>
       </div>
     </section>
 
