@@ -59,13 +59,15 @@ let objectUrl = null;
 let currentPose = 'neutral';
 let poseMirrored = false;
 let drag = null;
+const activePointers = new Map();
+let pinch = null;
 
 const transform = {
   x: 0,
   y: 0,
   scale: 1,
   rotX: 0,
-  rotY: 0,
+  rotY: 180,
   rotZ: 0,
 };
 
@@ -116,7 +118,7 @@ function resetTransform() {
   transform.y = 0;
   transform.scale = 1;
   transform.rotX = 0;
-  transform.rotY = 0;
+  transform.rotY = 180;
   transform.rotZ = 0;
   syncTransformUi();
   applyTransform();
@@ -341,38 +343,88 @@ for (const [key, input] of Object.entries(inputs)) {
   });
 }
 
+function getPointerDistance() {
+  const points = [...activePointers.values()];
+  if (points.length < 2) return 0;
+  return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+}
+
 stage.addEventListener('pointerdown', (event) => {
   if (!currentVrm) return;
   if (event.target.closest('.top-actions')) return;
 
   stage.setPointerCapture(event.pointerId);
-  drag = {
-    id: event.pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
-    originX: transform.x,
-    originY: transform.y,
-  };
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (activePointers.size === 1) {
+    drag = {
+      id: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: transform.x,
+      originY: transform.y,
+    };
+    pinch = null;
+  } else if (activePointers.size === 2) {
+    drag = null;
+    pinch = {
+      startDistance: getPointerDistance(),
+      startScale: transform.scale,
+    };
+  }
 });
 
 stage.addEventListener('pointermove', (event) => {
-  if (!drag || event.pointerId !== drag.id || !currentVrm) return;
+  if (!currentVrm || !activePointers.has(event.pointerId)) return;
+
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (activePointers.size >= 2 && pinch) {
+    const distance = getPointerDistance();
+    if (pinch.startDistance > 0) {
+      const ratio = distance / pinch.startDistance;
+      transform.scale = THREE.MathUtils.clamp(pinch.startScale * ratio, 0.2, 5);
+      inputs.scale.value = String(transform.scale);
+      outputs.scale.value = transform.scale.toFixed(2);
+      applyTransform();
+    }
+    return;
+  }
+
+  if (!drag || event.pointerId !== drag.id) return;
 
   const rect = stage.getBoundingClientRect();
   const dx = (event.clientX - drag.startX) / rect.width;
   const dy = (event.clientY - drag.startY) / rect.height;
 
-  // Perspective Camera上で扱いやすい感度へ変換
   transform.x = drag.originX + dx * 3.2;
   transform.y = drag.originY - dy * 4.2;
   applyTransform();
 });
 
-function endDrag(event) {
-  if (drag?.id === event.pointerId) drag = null;
+function endPointer(event) {
+  activePointers.delete(event.pointerId);
+
+  if (activePointers.size < 2) {
+    pinch = null;
+  }
+
+  if (activePointers.size === 1) {
+    const [id, point] = activePointers.entries().next().value;
+    drag = {
+      id,
+      startX: point.x,
+      startY: point.y,
+      originX: transform.x,
+      originY: transform.y,
+    };
+  } else {
+    drag = null;
+  }
 }
-stage.addEventListener('pointerup', endDrag);
-stage.addEventListener('pointercancel', endDrag);
+
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
 
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
@@ -431,32 +483,42 @@ async function capturePhoto() {
     return;
   }
 
-  const w = video.videoWidth;
-  const h = video.videoHeight;
-  captureCanvas.width = w;
-  captureCanvas.height = h;
+  // 保存画像はプレビュー(stage)と同じアスペクト比に固定する。
+  // 長辺の解像度は元カメラを超えない範囲で決める。
+  const stageRatio = stage.clientWidth / stage.clientHeight;
+  const videoW = video.videoWidth;
+  const videoH = video.videoHeight;
+  const videoRatio = videoW / videoH;
+
+  let sx = 0, sy = 0, sw = videoW, sh = videoH;
+
+  if (videoRatio > stageRatio) {
+    sw = videoH * stageRatio;
+    sx = (videoW - sw) / 2;
+  } else {
+    sh = videoW / stageRatio;
+    sy = (videoH - sh) / 2;
+  }
+
+  const maxOutputLongSide = 2048;
+  let outW, outH;
+
+  if (stageRatio >= 1) {
+    outW = Math.min(Math.round(sw), maxOutputLongSide);
+    outH = Math.round(outW / stageRatio);
+  } else {
+    outH = Math.min(Math.round(sh), maxOutputLongSide);
+    outW = Math.round(outH * stageRatio);
+  }
+
+  captureCanvas.width = outW;
+  captureCanvas.height = outH;
 
   const ctx = captureCanvas.getContext('2d');
   if (!ctx) return;
 
-  // CSS object-fit: cover と同等になるようにカメラ映像を切り抜く
-  const stageRatio = stage.clientWidth / stage.clientHeight;
-  const videoRatio = w / h;
-
-  let sx = 0, sy = 0, sw = w, sh = h;
-
-  if (videoRatio > stageRatio) {
-    sw = h * stageRatio;
-    sx = (w - sw) / 2;
-  } else {
-    sh = w / stageRatio;
-    sy = (h - sh) / 2;
-  }
-
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
-
-  // WebGL Canvasをカメラ解像度へ拡大合成
-  ctx.drawImage(renderer.domElement, 0, 0, w, h);
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
+  ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
 
   const blob = await new Promise((resolve) =>
     captureCanvas.toBlob(resolve, 'image/jpeg', 0.92)
@@ -475,7 +537,7 @@ async function capturePhoto() {
   a.click();
 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setStatus('写真を書き出しました。');
+  setStatus(`写真を書き出しました（${outW}×${outH}）`);
 }
 
 const resizeObserver = new ResizeObserver(resizeRenderer);
