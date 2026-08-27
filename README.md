@@ -1,4 +1,4 @@
-# Virtual Nuikatsu MVP
+# NuiRM-Camera
 
 スマートフォンブラウザ向けの「バーチャルぬい撮り」最小動作版です。
 
@@ -74,3 +74,34 @@ CDNから以下を読み込みます。
 
 MVPなので、VRMごとのボーン構成・初期姿勢・モデルサイズ差に対する自動補正は最低限です。
 特にポーズはHumanoidボーンを前提としています。
+
+
+## v0.2変更点
+
+- 保存画像をプレビューと同じアスペクト比に修正
+- 撮影ボタンを「調整 / ポーズ / 表情」タブの上へ移動
+- 2本指ピンチによるScale操作を追加
+- Scale最大値を5へ変更
+- Rotate Yを0〜360°へ変更
+- Rotate Y初期値を180°へ変更
+
+
+## v0.3変更点
+
+- プロジェクト名を `NuiRM-Camera` に変更
+- HTML titleを `NuiRM-Camera` に変更
+- 撮影画像名を `NuiRM-yyyy-mm-dd-HHmmss.jpg` に変更
+- Rotate Y表示初期値を180°に統一
+- ピンチ中のXY移動誤作動なし・保存写真上のVRM位置ずれなしを実機確認済みとして記録
+
+
+## v0.4変更点
+
+- Rotate X/Y/Zをカメラ（画面）基準の固定軸からQuaternion合成する方式へ変更
+- 回転合成順を Yaw(Y) → Pitch(X) → Roll(Z) に変更
+- LIGHTタブを追加
+- 主光源の色・強度を追加
+- 主光源方向をドラッグ式XYパッドで操作可能に変更
+- 環境光の色・強度を追加
+- UnrealBloomPassによるGlowを追加
+- 背景はHTML video、BloomはThree.js側だけで行うためGlow対象はVRMのみ
