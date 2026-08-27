@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111111" />
-  <title>Virtual Nuikatsu MVP</title>
+  <title>NuiRM-Camera</title>
   <link rel="stylesheet" href="./style.css" />
 
   <script type="importmap">
@@ -43,6 +43,7 @@
         <button class="tab active" data-panel="adjustPanel" type="button">調整</button>
         <button class="tab" data-panel="posePanel" type="button">ポーズ</button>
         <button class="tab" data-panel="facePanel" type="button">表情</button>
+        <button class="tab" data-panel="lightPanel" type="button">LIGHT</button>
       </div>
 
       <div id="adjustPanel" class="panel active">
@@ -52,7 +53,7 @@
         <label>Rotate X <output id="rotXOut">0°</output>
           <input id="rotX" type="range" min="-180" max="180" step="1" value="0" />
         </label>
-        <label>Rotate Y <output id="rotYOut">0°</output>
+        <label>Rotate Y <output id="rotYOut">180°</output>
           <input id="rotY" type="range" min="0" max="360" step="1" value="180" />
         </label>
         <label>Rotate Z <output id="rotZOut">0°</output>
@@ -73,6 +74,47 @@
       <div id="facePanel" class="panel">
         <div id="expressionList" class="button-grid">
           <span class="muted">VRMを読み込むと表情一覧が表示されます。</span>
+        </div>
+      </div>
+
+
+      <div id="lightPanel" class="panel">
+        <div class="light-section">
+          <h2>主光源</h2>
+          <label class="color-row">Color
+            <input id="keyLightColor" type="color" value="#ffffff" />
+          </label>
+          <label>Intensity <output id="keyLightIntensityOut">2.50</output>
+            <input id="keyLightIntensity" type="range" min="0" max="8" step="0.05" value="2.5" />
+          </label>
+          <div class="direction-heading">
+            <span>Direction</span>
+            <output id="lightDirectionOut">X 17° / Y 17°</output>
+          </div>
+          <div id="lightDirectionPad" class="direction-pad" role="application" aria-label="主光源の方向。ドラッグでX/Y回転">
+            <div class="direction-cross horizontal"></div>
+            <div class="direction-cross vertical"></div>
+            <div id="lightDirectionDot" class="direction-dot"></div>
+          </div>
+          <p class="hint">パッドをドラッグ：左右＝光源Y回転、上下＝光源X回転</p>
+        </div>
+
+        <div class="light-section">
+          <h2>環境光</h2>
+          <label class="color-row">Color
+            <input id="ambientLightColor" type="color" value="#ffffff" />
+          </label>
+          <label>Intensity <output id="ambientLightIntensityOut">1.30</output>
+            <input id="ambientLightIntensity" type="range" min="0" max="5" step="0.05" value="1.3" />
+          </label>
+        </div>
+
+        <div class="light-section">
+          <h2>Glow</h2>
+          <label>Strength <output id="glowStrengthOut">0.30</output>
+            <input id="glowStrength" type="range" min="0" max="2.5" step="0.05" value="0.3" />
+          </label>
+          <p class="hint">GlowはVRMレイヤーのみに適用され、カメラ映像には影響しません。</p>
         </div>
       </div>
 
