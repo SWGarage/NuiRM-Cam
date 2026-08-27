@@ -21,7 +21,6 @@
   <main class="app">
     <section id="stage" class="stage" aria-label="撮影プレビュー">
       <video id="cameraVideo" autoplay muted playsinline></video>
-      <canvas id="glowCanvas"></canvas>
       <canvas id="vrmCanvas"></canvas>
 
       <div id="status" class="status">カメラを開始してください</div>
@@ -58,7 +57,7 @@
           <input id="rotY" type="range" min="0" max="360" step="1" value="180" />
         </label>
         <label>Rotate Z <output id="rotZOut">0°</output>
-          <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" />
+          <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" dir="rtl" />
         </label>
         <p class="hint">アバターはプレビュー上を1本指でドラッグしてX/Y移動できます。</p>
       </div>
@@ -110,13 +109,6 @@
           </label>
         </div>
 
-        <div class="light-section">
-          <h2>Glow</h2>
-          <label>Strength <output id="glowStrengthOut">0.10</output>
-            <input id="glowStrength" type="range" min="0" max="2.5" step="0.05" value="0.1" />
-          </label>
-          <p class="hint">GlowはVRMレイヤーのみに適用され、カメラ映像には影響しません。</p>
-        </div>
       </div>
 
       <div class="capture-row">
