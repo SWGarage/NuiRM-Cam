@@ -427,25 +427,18 @@ input[type="range"]:focus-visible {
 }
 
 
-/* Pose layout: fixed first row + additional poses below */
-.pose-first-row {
+/* v11 additions built directly on v10 */
+.pose-fixed-first-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.pose-first-row > button {
+.pose-fixed-first-row > button {
   width: 100%;
 }
 
-.pose-extra-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-/* Global reset stays isolated at bottom of every menu */
 .global-reset-section {
   margin-top: 20px;
 }

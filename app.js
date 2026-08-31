@@ -9,12 +9,12 @@ const statusEl = document.querySelector('#status');
 const cameraButton = document.querySelector('#cameraButton');
 const vrmFile = document.querySelector('#vrmFile');
 const captureButton = document.querySelector('#captureButton');
-const resetButton = document.querySelector('#resetButton');
 const captureCanvas = document.querySelector('#captureCanvas');
 const expressionList = document.querySelector('#expressionList');
 const poseList = document.querySelector('#poseList');
 const lightPresetList = document.querySelector('#lightPresetList');
 const mirrorButton = document.querySelector('#mirrorPose');
+const poseBasicButton = document.querySelector('#poseBasic');
 const keyLightColorInput = document.querySelector('#keyLightColor');
 const keyLightIntensityInput = document.querySelector('#keyLightIntensity');
 const keyLightIntensityOut = document.querySelector('#keyLightIntensityOut');
@@ -569,6 +569,8 @@ function buildPoseButtons() {
   }
 
   for (const pose of posePresets) {
+    if (pose.id === 'neutral' || pose.name === '基本') continue;
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'button pose-button';
@@ -577,6 +579,7 @@ function buildPoseButtons() {
     button.classList.toggle('active', pose.id === currentPose);
     button.addEventListener('click', () => {
       currentPose = pose.id;
+      poseBasicButton?.classList.remove('active');
       poseList.querySelectorAll('.pose-button').forEach((b) => {
         b.classList.toggle('active', b === button);
       });
@@ -836,10 +839,20 @@ document.querySelectorAll('.tab').forEach((tab) => {
     document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
 
     tab.classList.add('active');
-    document.querySelector(`#${tab.dataset.panel}`).classList.add('active');
+    const panelId = tab.dataset.panel;
+    if (panelId) document.querySelector(`#${panelId}`)?.classList.add('active');
   });
 });
 
+
+poseBasicButton?.addEventListener('click', () => {
+  currentPose = 'neutral';
+  poseList.querySelectorAll('.pose-button').forEach((button) => {
+    button.classList.remove('active');
+  });
+  poseBasicButton.classList.add('active');
+  applyPose();
+});
 
 mirrorButton.addEventListener('click', () => {
   poseMirrored = !poseMirrored;
@@ -850,7 +863,7 @@ mirrorButton.addEventListener('click', () => {
 cameraButton.addEventListener('click', startCamera);
 vrmFile.addEventListener('change', () => loadVrm(vrmFile.files?.[0]));
 
-resetButton.addEventListener('click', () => {
+function resetAllSettings() {
   backgroundSource.mode = 'camera';
   updateBackgroundPreview();
   updateBackgroundSourceUi();
@@ -862,8 +875,9 @@ resetButton.addEventListener('click', () => {
   mirrorButton.classList.remove('active');
 
   poseList.querySelectorAll('.pose-button').forEach((button) => {
-    button.classList.toggle('active', button.dataset.pose === 'neutral');
+    button.classList.remove('active');
   });
+  poseBasicButton?.classList.add('active');
 
   applyPose();
 
@@ -873,6 +887,10 @@ resetButton.addEventListener('click', () => {
     const first = expressionList.querySelector('.expression-button');
     if (first) markActiveExpression(first);
   }
+}
+
+document.querySelectorAll('.settings-reset-button').forEach((button) => {
+  button.addEventListener('click', resetAllSettings);
 });
 
 captureButton.addEventListener('click', capturePhoto);
@@ -1044,19 +1062,4 @@ document.querySelectorAll('.tabbar .tab').forEach((tab) => {
       panel.classList.toggle('active', isTarget);
     });
   });
-});
-
-
-// global-reset-section-handler
-document.querySelectorAll('.settings-reset-button').forEach((button) => {
-  button.addEventListener('click', () => resetTransform());
-});
-
-
-// pose-basic-fixed-handler
-document.querySelector('.pose-basic-button')?.addEventListener('click', () => {
-  (() => {
-    const p = (poseData?.poses ?? poses ?? []).find((x) => x.id === 'neutral' || x.name === '基本');
-    if (p) applyPose(p);
-  })();
 });
