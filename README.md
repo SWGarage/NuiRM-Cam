@@ -180,3 +180,24 @@ VRM読込後に以下を表示します。
 
 「コピー」ボタンで結果をクリップボードへコピーできます。
 このDEBUG機能は読み取り専用で、マテリアル値を変更しません。
+
+
+## Roughness verification build
+
+DEBUGレポートへ以下を追加しました。
+
+- `rawGltfMaterials`
+  - VRM/GLB内部JSONの `materials[].pbrMetallicRoughness`
+  - `metallicFactor`
+  - `roughnessFactor`
+  - metallicRoughnessTexture の有無
+- `roughnessComparison`
+  - `rawRoughnessFactor`
+  - Three.js変換後の `threeRoughness`
+  - 両者が一致しているか `matches`
+
+判定例:
+
+- raw=0 / three=0 → VRM内部ですでにroughness 0。Exporter側またはVRM生成段階を疑う
+- raw=1 / three=0 → Loader/three-vrm側の変換を疑う
+- raw=1 / three=1 → 変換正常

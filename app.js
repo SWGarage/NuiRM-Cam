@@ -81,6 +81,7 @@ const clock = new THREE.Clock();
 
 let stream = null;
 let currentVrm = null;
+let currentGltfParser = null;
 let objectUrl = null;
 let currentPose = 'neutral';
 let posePresets = [];
@@ -408,6 +409,37 @@ function collectMaterialDebug(material, index, meshes) {
   };
 }
 
+
+function collectRawGltfMaterials(vrm = currentVrm) {
+  const parser = vrm?.userData?.gltfExtensions
+    ? null
+    : null;
+
+  // GLTFLoaderのparserはgltf.userData側に保持されることがあるため、
+  // load時にcurrentGltfParserへ保存したものを優先する。
+  const json = currentGltfParser?.json;
+  const materials = json?.materials ?? [];
+
+  return materials.map((material, index) => {
+    const pbr = material.pbrMetallicRoughness ?? {};
+
+    return {
+      index,
+      name: material.name ?? '(unnamed)',
+      alphaMode: material.alphaMode ?? 'OPAQUE',
+      doubleSided: Boolean(material.doubleSided),
+      pbrMetallicRoughness: {
+        baseColorFactor: pbr.baseColorFactor ?? null,
+        metallicFactor: pbr.metallicFactor ?? 1,
+        roughnessFactor: pbr.roughnessFactor ?? 1,
+        baseColorTexture: pbr.baseColorTexture ?? null,
+        metallicRoughnessTexture: pbr.metallicRoughnessTexture ?? null,
+      },
+      extensions: material.extensions ?? null,
+    };
+  });
+}
+
 function buildMaterialDebugReport(vrm = currentVrm) {
   if (!vrm?.scene) {
     return 'VRMを読み込むとマテリアル情報が表示されます。';
@@ -448,6 +480,7 @@ function buildMaterialDebugReport(vrm = currentVrm) {
       metaVersion,
       materialCount: materials.length,
     },
+    rawGltfMaterials: collectRawGltfMaterials(vrm),
     renderer: {
       outputColorSpace: renderer.outputColorSpace,
       toneMapping: renderer.toneMapping,
@@ -464,6 +497,20 @@ function buildMaterialDebugReport(vrm = currentVrm) {
       },
     },
     materials,
+    roughnessComparison: materials.map((material, index) => {
+      const raw = collectRawGltfMaterials(vrm)[index];
+      return {
+        index,
+        name: material.name,
+        rawRoughnessFactor:
+          raw?.pbrMetallicRoughness?.roughnessFactor ?? null,
+        threeRoughness:
+          material.properties?.roughness ?? null,
+        matches:
+          raw?.pbrMetallicRoughness?.roughnessFactor ===
+          material.properties?.roughness,
+      };
+    }),
   };
 
   return JSON.stringify(report, null, 2);
@@ -495,6 +542,7 @@ async function loadVrm(file) {
       scene.remove(currentVrm.scene);
       VRMUtils.deepDispose(currentVrm.scene);
       currentVrm = null;
+      currentGltfParser = null;
       debugOutput.textContent = 'VRMを読み込むとマテリアル情報が表示されます。';
     }
 
@@ -502,6 +550,7 @@ async function loadVrm(file) {
     objectUrl = URL.createObjectURL(file);
 
     const gltf = await loader.loadAsync(objectUrl);
+    currentGltfParser = gltf.parser ?? null;
     const vrm = gltf.userData.vrm;
 
     if (!vrm) throw new Error('VRM data not found');
