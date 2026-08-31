@@ -182,22 +182,24 @@ VRM読込後に以下を表示します。
 このDEBUG機能は読み取り専用で、マテリアル値を変更しません。
 
 
-## Roughness verification build
+## Roughness Verify build 3
 
-DEBUGレポートへ以下を追加しました。
+This diagnostic build compares the raw glTF value stored inside the VRM/GLB
+with the Three.js material value after loading.
 
-- `rawGltfMaterials`
-  - VRM/GLB内部JSONの `materials[].pbrMetallicRoughness`
-  - `metallicFactor`
-  - `roughnessFactor`
-  - metallicRoughnessTexture の有無
-- `roughnessComparison`
-  - `rawRoughnessFactor`
-  - Three.js変換後の `threeRoughness`
-  - 両者が一致しているか `matches`
+Check the DEBUG report for:
 
-判定例:
+- `NuiRMDebug: 3`
+- `verificationBuild: "roughness-verify-final"`
+- `rawGltfMaterials[].pbrMetallicRoughness.roughnessFactor`
+- `materials[].properties.roughness`
+- `roughnessComparison[]`
 
-- raw=0 / three=0 → VRM内部ですでにroughness 0。Exporter側またはVRM生成段階を疑う
-- raw=1 / three=0 → Loader/three-vrm側の変換を疑う
-- raw=1 / three=1 → 変換正常
+Interpretation:
+
+- `rawRoughnessFactor = 0`, `threeRoughness = 0`
+  - The VRM/GLB already stores roughness 0. Three.js is reading it correctly.
+- `rawRoughnessFactor = 1`, `threeRoughness = 0`
+  - The discrepancy occurs during loading/material conversion.
+- `rawRoughnessFactor = 1`, `threeRoughness = 1`
+  - The value is propagated correctly.

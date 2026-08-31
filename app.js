@@ -410,19 +410,12 @@ function collectMaterialDebug(material, index, meshes) {
 }
 
 
-function collectRawGltfMaterials(vrm = currentVrm) {
-  const parser = vrm?.userData?.gltfExtensions
-    ? null
-    : null;
-
-  // GLTFLoaderのparserはgltf.userData側に保持されることがあるため、
-  // load時にcurrentGltfParserへ保存したものを優先する。
+function collectRawGltfMaterials() {
   const json = currentGltfParser?.json;
   const materials = json?.materials ?? [];
 
   return materials.map((material, index) => {
     const pbr = material.pbrMetallicRoughness ?? {};
-
     return {
       index,
       name: material.name ?? '(unnamed)',
@@ -436,6 +429,35 @@ function collectRawGltfMaterials(vrm = currentVrm) {
         metallicRoughnessTexture: pbr.metallicRoughnessTexture ?? null,
       },
       extensions: material.extensions ?? null,
+    };
+  });
+}
+
+function buildRoughnessComparison(materials) {
+  const rawMaterials = collectRawGltfMaterials();
+
+  return materials.map((material, index) => {
+    const raw =
+      rawMaterials.find((item) => item.name === material.name) ??
+      rawMaterials[index] ??
+      null;
+
+    const rawRoughnessFactor =
+      raw?.pbrMetallicRoughness?.roughnessFactor ?? null;
+    const threeRoughness =
+      material?.properties?.roughness ?? null;
+
+    return {
+      index,
+      name: material.name,
+      rawMaterialName: raw?.name ?? null,
+      rawRoughnessFactor,
+      threeRoughness,
+      matches:
+        rawRoughnessFactor !== null &&
+        threeRoughness !== null
+          ? rawRoughnessFactor === threeRoughness
+          : null,
     };
   });
 }
@@ -475,12 +497,13 @@ function buildMaterialDebugReport(vrm = currentVrm) {
     '(unknown)';
 
   const report = {
-    NuiRMDebug: 1,
+    NuiRMDebug: 3,
+    verificationBuild: 'roughness-verify-final',
     vrm: {
       metaVersion,
       materialCount: materials.length,
     },
-    rawGltfMaterials: collectRawGltfMaterials(vrm),
+    rawGltfMaterials: collectRawGltfMaterials(),
     renderer: {
       outputColorSpace: renderer.outputColorSpace,
       toneMapping: renderer.toneMapping,
@@ -497,20 +520,7 @@ function buildMaterialDebugReport(vrm = currentVrm) {
       },
     },
     materials,
-    roughnessComparison: materials.map((material, index) => {
-      const raw = collectRawGltfMaterials(vrm)[index];
-      return {
-        index,
-        name: material.name,
-        rawRoughnessFactor:
-          raw?.pbrMetallicRoughness?.roughnessFactor ?? null,
-        threeRoughness:
-          material.properties?.roughness ?? null,
-        matches:
-          raw?.pbrMetallicRoughness?.roughnessFactor ===
-          material.properties?.roughness,
-      };
-    }),
+    roughnessComparison: buildRoughnessComparison(materials),
   };
 
   return JSON.stringify(report, null, 2);
@@ -542,7 +552,6 @@ async function loadVrm(file) {
       scene.remove(currentVrm.scene);
       VRMUtils.deepDispose(currentVrm.scene);
       currentVrm = null;
-      currentGltfParser = null;
       debugOutput.textContent = 'VRMを読み込むとマテリアル情報が表示されます。';
     }
 
