@@ -21,6 +21,7 @@
   <main class="app">
     <section id="stage" class="stage" aria-label="撮影プレビュー">
       <video id="cameraVideo" autoplay muted playsinline></video>
+    <img id="backgroundImagePreview" alt="" />
       <canvas id="vrmCanvas"></canvas>
 
       <div id="status" class="status">カメラを開始してください</div>
@@ -44,10 +45,37 @@
         <button class="tab" data-panel="posePanel" type="button">ポーズ</button>
         <button class="tab" data-panel="facePanel" type="button">表情</button>
         <button class="tab" data-panel="lightPanel" type="button">LIGHT</button>
-        <button class="tab" data-panel="debugPanel" type="button">DEBUG</button>
-      </div>
+        </div>
 
       <div id="adjustPanel" class="panel active">
+
+        <section class="control-section">
+          <h3>Background</h3>
+          <div class="segmented-control background-source-control">
+            <button type="button"
+                    class="active"
+                    data-background-mode="camera"
+                    onclick="setBackgroundMode('camera')">
+              Camera
+            </button>
+            <button type="button"
+                    data-background-mode="image"
+                    onclick="setBackgroundMode('image')">
+              Image
+            </button>
+          </div>
+          <button type="button"
+                  class="secondary-button background-image-button"
+                  onclick="document.getElementById('backgroundImageInput').click()">
+            画像を選択
+          </button>
+          <input id="backgroundImageInput"
+                 type="file"
+                 accept="image/*"
+                 hidden />
+          <div id="backgroundImageName" class="control-note">画像未選択</div>
+        </section>
+
         <label>Scale <output id="scaleOut">1.00</output>
           <input id="scale" type="range" min="0.2" max="5" step="0.01" value="1" />
         </label>
@@ -97,6 +125,7 @@
 
 
       <div id="lightPanel" class="panel">
+
         <div class="light-section">
           <h2>Preset</h2>
           <div id="lightPresetList" class="button-grid">
@@ -137,19 +166,6 @@
 
       </div>
 
-
-      <div id="debugPanel" class="panel">
-        <div class="debug-actions">
-          <button id="refreshDebug" class="button" type="button">再取得</button>
-          <button id="copyDebug" class="button" type="button">コピー</button>
-        </div>
-        <p class="hint">
-          VRM読込後のThree.jsマテリアル情報を表示します。表示内容だけを確認し、マテリアル値は変更しません。
-        </p>
-        <div class="debug-build-label">Roughness Verify build 3</div>
-          <pre id="debugOutput" class="debug-output">VRMを読み込むとマテリアル情報が表示されます。</pre>
-      </div>
-
       <div class="capture-row">
         <button id="resetButton" class="button secondary" type="button">リセット</button>
       </div>
@@ -158,6 +174,6 @@
     <canvas id="captureCanvas" hidden></canvas>
   </main>
 
-  <script type="module" src="./app.js?v=roughness-verify-final-3"></script>
+  <script type="module" src="./app.js?v=nuirm-v09-clean-imagebg-2"></script>
 </body>
 </html>

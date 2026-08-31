@@ -27,9 +27,6 @@ const lightDirectionOut = document.querySelector('#lightDirectionOut');
 const focalLengthInput = document.querySelector('#focalLength');
 const focalLengthOut = document.querySelector('#focalLengthOut');
 const focalPresetButtons = [...document.querySelectorAll('.focal-preset')];
-const debugOutput = document.querySelector('#debugOutput');
-const refreshDebugButton = document.querySelector('#refreshDebug');
-const copyDebugButton = document.querySelector('#copyDebug');
 
 const inputs = {
   scale: document.querySelector('#scale'),
@@ -81,7 +78,14 @@ const clock = new THREE.Clock();
 
 let stream = null;
 let currentVrm = null;
-let currentGltfParser = null;
+
+const backgroundSource = {
+  mode: 'camera', // camera | image
+  image: null,
+  imageUrl: null,
+};
+
+
 let objectUrl = null;
 let currentPose = 'neutral';
 let posePresets = [];
@@ -319,229 +323,6 @@ async function startCamera() {
 }
 
 
-function formatDebugValue(value) {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? Number(value.toFixed(5)) : String(value);
-  }
-
-  if (typeof value === 'boolean' || typeof value === 'string') {
-    return value;
-  }
-
-  if (value?.isColor && typeof value.getHexString === 'function') {
-    return `#${value.getHexString()}`;
-  }
-
-  if (value?.isTexture) {
-    return {
-      texture: true,
-      name: value.name || '',
-      colorSpace: value.colorSpace ?? null,
-    };
-  }
-
-  if (value?.isVector2 || value?.isVector3 || value?.isVector4) {
-    const result = {};
-    if ('x' in value) result.x = formatDebugValue(value.x);
-    if ('y' in value) result.y = formatDebugValue(value.y);
-    if ('z' in value) result.z = formatDebugValue(value.z);
-    if ('w' in value) result.w = formatDebugValue(value.w);
-    return result;
-  }
-
-  return String(value);
-}
-
-function collectMaterialDebug(material, index, meshes) {
-  const candidateKeys = [
-    'metalness',
-    'roughness',
-    'specularIntensity',
-    'specularColor',
-    'ior',
-    'reflectivity',
-    'envMapIntensity',
-    'clearcoat',
-    'clearcoatRoughness',
-    'sheen',
-    'sheenRoughness',
-    'emissive',
-    'emissiveIntensity',
-    'opacity',
-    'transparent',
-    'alphaTest',
-    'depthWrite',
-    'side',
-    'shadeColorFactor',
-    'shadingShiftFactor',
-    'shadingToonyFactor',
-    'giEqualizationFactor',
-    'matcapFactor',
-    'parametricRimColorFactor',
-    'parametricRimFresnelPowerFactor',
-    'parametricRimLiftFactor',
-    'rimLightingMixFactor',
-    'outlineWidthFactor',
-    'outlineLightingMixFactor',
-  ];
-
-  const properties = {};
-  for (const key of candidateKeys) {
-    if (key in material) {
-      properties[key] = formatDebugValue(material[key]);
-    }
-  }
-
-  return {
-    index,
-    name: material.name || '(unnamed)',
-    type: material.type || material.constructor?.name || '(unknown)',
-    constructor: material.constructor?.name || '(unknown)',
-    isMToonMaterial: Boolean(material.isMToonMaterial),
-    isMeshStandardMaterial: Boolean(material.isMeshStandardMaterial),
-    isMeshPhysicalMaterial: Boolean(material.isMeshPhysicalMaterial),
-    shaderName: material.userData?.shaderName ?? null,
-    meshes,
-    properties,
-  };
-}
-
-
-function collectRawGltfMaterials() {
-  const json = currentGltfParser?.json;
-  const materials = json?.materials ?? [];
-
-  return materials.map((material, index) => {
-    const pbr = material.pbrMetallicRoughness ?? {};
-    return {
-      index,
-      name: material.name ?? '(unnamed)',
-      alphaMode: material.alphaMode ?? 'OPAQUE',
-      doubleSided: Boolean(material.doubleSided),
-      pbrMetallicRoughness: {
-        baseColorFactor: pbr.baseColorFactor ?? null,
-        metallicFactor: pbr.metallicFactor ?? 1,
-        roughnessFactor: pbr.roughnessFactor ?? 1,
-        baseColorTexture: pbr.baseColorTexture ?? null,
-        metallicRoughnessTexture: pbr.metallicRoughnessTexture ?? null,
-      },
-      extensions: material.extensions ?? null,
-    };
-  });
-}
-
-function buildRoughnessComparison(materials) {
-  const rawMaterials = collectRawGltfMaterials();
-
-  return materials.map((material, index) => {
-    const raw =
-      rawMaterials.find((item) => item.name === material.name) ??
-      rawMaterials[index] ??
-      null;
-
-    const rawRoughnessFactor =
-      raw?.pbrMetallicRoughness?.roughnessFactor ?? null;
-    const threeRoughness =
-      material?.properties?.roughness ?? null;
-
-    return {
-      index,
-      name: material.name,
-      rawMaterialName: raw?.name ?? null,
-      rawRoughnessFactor,
-      threeRoughness,
-      matches:
-        rawRoughnessFactor !== null &&
-        threeRoughness !== null
-          ? rawRoughnessFactor === threeRoughness
-          : null,
-    };
-  });
-}
-
-function buildMaterialDebugReport(vrm = currentVrm) {
-  if (!vrm?.scene) {
-    return 'VRMを読み込むとマテリアル情報が表示されます。';
-  }
-
-  const materialMap = new Map();
-
-  vrm.scene.traverse((object) => {
-    if (!object.isMesh && !object.isSkinnedMesh) return;
-
-    const materials = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-
-    for (const material of materials) {
-      if (!material) continue;
-
-      if (!materialMap.has(material)) {
-        materialMap.set(material, []);
-      }
-
-      materialMap.get(material).push(object.name || '(unnamed mesh)');
-    }
-  });
-
-  const materials = [...materialMap.entries()].map(
-    ([material, meshes], index) => collectMaterialDebug(material, index, meshes)
-  );
-
-  const metaVersion =
-    vrm.meta?.metaVersion ??
-    vrm.meta?.version ??
-    '(unknown)';
-
-  const report = {
-    NuiRMDebug: 3,
-    verificationBuild: 'roughness-verify-final',
-    vrm: {
-      metaVersion,
-      materialCount: materials.length,
-    },
-    rawGltfMaterials: collectRawGltfMaterials(),
-    renderer: {
-      outputColorSpace: renderer.outputColorSpace,
-      toneMapping: renderer.toneMapping,
-      toneMappingExposure: renderer.toneMappingExposure,
-    },
-    lighting: {
-      directional: {
-        intensity: keyLight.intensity,
-        color: `#${keyLight.color.getHexString()}`,
-      },
-      ambient: {
-        intensity: ambientLight.intensity,
-        color: `#${ambientLight.color.getHexString()}`,
-      },
-    },
-    materials,
-    roughnessComparison: buildRoughnessComparison(materials),
-  };
-
-  return JSON.stringify(report, null, 2);
-}
-
-function refreshMaterialDebug() {
-  debugOutput.textContent = buildMaterialDebugReport();
-}
-
-async function copyMaterialDebug() {
-  const text = debugOutput.textContent || buildMaterialDebugReport();
-
-  try {
-    await navigator.clipboard.writeText(text);
-    setStatus('DEBUG情報をコピーしました。');
-  } catch (error) {
-    console.error(error);
-    setStatus('コピーできませんでした。DEBUG欄を長押しして選択してください。');
-  }
-}
-
 async function loadVrm(file) {
   if (!file) return;
 
@@ -552,15 +333,13 @@ async function loadVrm(file) {
       scene.remove(currentVrm.scene);
       VRMUtils.deepDispose(currentVrm.scene);
       currentVrm = null;
-      debugOutput.textContent = 'VRMを読み込むとマテリアル情報が表示されます。';
     }
 
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(file);
 
     const gltf = await loader.loadAsync(objectUrl);
-    currentGltfParser = gltf.parser ?? null;
-    const vrm = gltf.userData.vrm;
+const vrm = gltf.userData.vrm;
 
     if (!vrm) throw new Error('VRM data not found');
 
@@ -580,13 +359,125 @@ async function loadVrm(file) {
     poseMirrored = false;
     applyPose();
     resetTransform();
-    refreshMaterialDebug();
-
-    setStatus('VRM読込完了');
+setStatus('VRM読込完了');
   } catch (error) {
     console.error(error);
     setStatus('VRMの読み込みに失敗しました。');
   }
+}
+
+
+function setBackgroundMode(mode) {
+  if (!['camera', 'image'].includes(mode)) return;
+
+  if (mode === 'image' && !backgroundSource.image) {
+    const fileInput = document.getElementById('backgroundImageInput');
+    fileInput?.click();
+    return;
+  }
+
+  backgroundSource.mode = mode;
+  updateBackgroundPreview();
+  updateBackgroundSourceUi();
+}
+
+function updateBackgroundSourceUi() {
+  document.querySelectorAll('[data-background-mode]').forEach((button) => {
+    button.classList.toggle(
+      'active',
+      button.dataset.backgroundMode === backgroundSource.mode
+    );
+  });
+
+  const nameEl = document.getElementById('backgroundImageName');
+  if (nameEl) {
+    nameEl.textContent = backgroundSource.image
+      ? (backgroundSource.image.dataset?.filename || '画像を読込済み')
+      : '画像未選択';
+  }
+}
+
+function updateBackgroundPreview() {
+  const video = document.getElementById('cameraVideo');
+  const image = document.getElementById('backgroundImagePreview');
+
+  if (!video || !image) return;
+
+  if (backgroundSource.mode === 'image' && backgroundSource.image) {
+    video.style.display = 'none';
+    image.style.display = 'block';
+  } else {
+    image.style.display = 'none';
+    video.style.display = 'block';
+  }
+}
+
+function loadBackgroundImageFile(file) {
+  if (!file || !file.type?.startsWith('image/')) return;
+
+  if (backgroundSource.imageUrl) {
+    URL.revokeObjectURL(backgroundSource.imageUrl);
+    backgroundSource.imageUrl = null;
+  }
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    img.dataset.filename = file.name;
+    backgroundSource.image = img;
+    backgroundSource.imageUrl = url;
+
+    const preview = document.getElementById('backgroundImagePreview');
+    if (preview) {
+      preview.src = url;
+      preview.alt = file.name;
+    }
+
+    backgroundSource.mode = 'image';
+    updateBackgroundPreview();
+    updateBackgroundSourceUi();
+  };
+
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+  };
+
+  img.src = url;
+}
+
+function drawCoverImage(ctx, source, destW, destH) {
+  const sourceW = source.videoWidth || source.naturalWidth || source.width;
+  const sourceH = source.videoHeight || source.naturalHeight || source.height;
+
+  if (!sourceW || !sourceH || !destW || !destH) return false;
+
+  const destRatio = destW / destH;
+  const sourceRatio = sourceW / sourceH;
+
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceW;
+  let sh = sourceH;
+
+  if (sourceRatio > destRatio) {
+    sw = sourceH * destRatio;
+    sx = (sourceW - sw) / 2;
+  } else {
+    sh = sourceW / destRatio;
+    sy = (sourceH - sh) / 2;
+  }
+
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, destW, destH);
+  return true;
+}
+
+function getActiveBackgroundSource() {
+  if (backgroundSource.mode === 'image' && backgroundSource.image) {
+    return backgroundSource.image;
+  }
+
+  return document.getElementById('cameraVideo');
 }
 
 function normalizeInitialVrm(vrm) {
@@ -958,10 +849,11 @@ mirrorButton.addEventListener('click', () => {
 
 cameraButton.addEventListener('click', startCamera);
 vrmFile.addEventListener('change', () => loadVrm(vrmFile.files?.[0]));
-refreshDebugButton.addEventListener('click', refreshMaterialDebug);
-copyDebugButton.addEventListener('click', copyMaterialDebug);
 
 resetButton.addEventListener('click', () => {
+  backgroundSource.mode = 'camera';
+  updateBackgroundPreview();
+  updateBackgroundSourceUi();
   resetTransform();
   cameraSettings.focalLength = 24;
   applyFocalLength();
@@ -1020,34 +912,53 @@ function downloadBlob(blob, filename) {
 }
 
 function capturePhoto() {
-  if (!video.videoWidth || !video.videoHeight) {
-    setStatus('先にカメラを開始してください。');
+  const activeBackground = getActiveBackgroundSource();
+
+  if (!activeBackground) {
+    setStatus('背景を用意してください。');
+    return;
+  }
+
+  const isVideo = activeBackground instanceof HTMLVideoElement;
+  const sourceW = isVideo
+    ? activeBackground.videoWidth
+    : activeBackground.naturalWidth;
+  const sourceH = isVideo
+    ? activeBackground.videoHeight
+    : activeBackground.naturalHeight;
+
+  if (!sourceW || !sourceH) {
+    if (backgroundSource.mode === 'image') {
+      setStatus('背景画像の読み込みが完了していません。');
+    } else {
+      setStatus('先にカメラを開始してください。');
+    }
     return;
   }
 
   const stageRatio = stage.clientWidth / stage.clientHeight;
-  const videoW = video.videoWidth;
-  const videoH = video.videoHeight;
-  const videoRatio = videoW / videoH;
+  const maxOutputLongSide = 2048;
 
-  let sx = 0, sy = 0, sw = videoW, sh = videoH;
+  // プレビューと同じ cover（中央クロップ）で出力サイズを決定。
+  // 元画像/カメラの解像度を超えて無意味に拡大しない。
+  let croppedW = sourceW;
+  let croppedH = sourceH;
+  const sourceRatio = sourceW / sourceH;
 
-  if (videoRatio > stageRatio) {
-    sw = videoH * stageRatio;
-    sx = (videoW - sw) / 2;
+  if (sourceRatio > stageRatio) {
+    croppedW = sourceH * stageRatio;
   } else {
-    sh = videoW / stageRatio;
-    sy = (videoH - sh) / 2;
+    croppedH = sourceW / stageRatio;
   }
 
-  const maxOutputLongSide = 2048;
-  let outW, outH;
+  let outW;
+  let outH;
 
   if (stageRatio >= 1) {
-    outW = Math.min(Math.round(sw), maxOutputLongSide);
+    outW = Math.min(Math.round(croppedW), maxOutputLongSide);
     outH = Math.round(outW / stageRatio);
   } else {
-    outH = Math.min(Math.round(sh), maxOutputLongSide);
+    outH = Math.min(Math.round(croppedH), maxOutputLongSide);
     outW = Math.round(outH * stageRatio);
   }
 
@@ -1057,7 +968,7 @@ function capturePhoto() {
   const ctx = captureCanvas.getContext('2d');
   if (!ctx) return;
 
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
+  drawCoverImage(ctx, activeBackground, outW, outH);
 
   renderer.render(scene, camera);
   ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
@@ -1092,7 +1003,7 @@ function capturePhoto() {
   }
 
   downloadBlob(blob, filename);
-  setStatus(`写真を書き出しました（${outW}×${outH}）`);
+  setStatus(`写真を保存しました（${outW}×${outH}）`);
 }
 
 const resizeObserver = new ResizeObserver(resizeRenderer);
@@ -1104,3 +1015,14 @@ syncLightingUi();
 applyLighting();
 loadPosePresets();
 loadLightPresets();
+
+
+
+window.setBackgroundMode = setBackgroundMode;
+
+document.getElementById('backgroundImageInput')?.addEventListener('change', (event) => {
+  const file = event.target.files?.[0];
+  if (file) loadBackgroundImageFile(file);
+});
+updateBackgroundSourceUi();
+updateBackgroundPreview();

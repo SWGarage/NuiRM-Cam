@@ -112,7 +112,7 @@ button, input {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -331,19 +331,35 @@ output {
   margin-bottom: 10px;
 }
 
-.debug-output {
+/* Background source */
+#backgroundImagePreview {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  min-height: 240px;
-  max-height: 55vh;
-  overflow: auto;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid #3a3a3a;
-  border-radius: 10px;
-  background: #0d0d0d;
-  color: #ddd;
-  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  user-select: text;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#cameraVideo {
+  z-index: 0;
+}
+
+#vrmCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.background-source-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.background-image-button {
+  width: 100%;
+  margin-top: 8px;
 }

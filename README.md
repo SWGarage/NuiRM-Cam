@@ -203,3 +203,55 @@ Interpretation:
   - The discrepancy occurs during loading/material conversion.
 - `rawRoughnessFactor = 1`, `threeRoughness = 1`
   - The value is propagated correctly.
+
+
+## v0.8 Material Compatibility
+
+Material compatibility modes:
+
+- `Original`
+  - Use the roughness values contained in the VRM/GLB without modification.
+- `Auto`
+  - Conservative legacy VRM0 compatibility rule.
+  - Applies only to `MeshStandardMaterial` when:
+    - VRM `metaVersion` is `0`
+    - raw glTF `roughnessFactor` is `0`
+    - no `metallicRoughnessTexture` is present
+  - Corrected value: `roughness = 1.0`
+- `Soft Toy`
+  - Forces `roughness = 1.0` on all `MeshStandardMaterial` materials.
+  - MToon materials are not modified.
+
+The original Three.js roughness value is stored when the model loads, so changing
+back to `Original` restores the initial value.
+
+The Auto rule is intentionally conservative. A legitimate glossy VRM0 material
+with exactly roughness=0 and no metallicRoughnessTexture can still match this
+heuristic; use Original for such models.
+
+
+## v0.9 Image Background
+
+Removed:
+- DEBUG tab and material diagnostic UI
+- Material Compatibility controls and roughness compatibility override
+
+Added:
+- Background source selector: `Camera` / `Image`
+- Local image file picker (`accept="image/*"`)
+- Selected image is shown behind the VRM using `object-fit: cover`
+- Capture uses the active background source and applies the same center-crop / cover logic
+- Switching back to Camera does not discard the selected image; it can be reused
+
+The VRM rendering canvas and existing pose/expression/lighting/focal-length behavior are unchanged.
+
+
+## v0.9 clean image-background build
+
+- DEBUG UI/code removed.
+- Material Compatibility UI/code removed.
+- Background can be switched between Camera and a local Image.
+- Image mode works even when the camera has not been started.
+- Preview uses CSS `object-fit: cover`.
+- Capture uses the same centered cover crop via `drawCoverImage()`.
+- Selected image remains loaded when switching back to Camera.
