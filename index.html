@@ -44,6 +44,7 @@
         <button class="tab" data-panel="posePanel" type="button">ポーズ</button>
         <button class="tab" data-panel="facePanel" type="button">表情</button>
         <button class="tab" data-panel="lightPanel" type="button">LIGHT</button>
+        <button class="tab" data-panel="debugPanel" type="button">DEBUG</button>
       </div>
 
       <div id="adjustPanel" class="panel active">
@@ -134,6 +135,18 @@
           </label>
         </div>
 
+      </div>
+
+
+      <div id="debugPanel" class="panel">
+        <div class="debug-actions">
+          <button id="refreshDebug" class="button" type="button">再取得</button>
+          <button id="copyDebug" class="button" type="button">コピー</button>
+        </div>
+        <p class="hint">
+          VRM読込後のThree.jsマテリアル情報を表示します。表示内容だけを確認し、マテリアル値は変更しません。
+        </p>
+        <pre id="debugOutput" class="debug-output">VRMを読み込むとマテリアル情報が表示されます。</pre>
       </div>
 
       <div class="capture-row">

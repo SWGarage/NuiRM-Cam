@@ -156,3 +156,27 @@ MVPなので、VRMごとのボーン構成・初期姿勢・モデルサイズ�
 - ライティングプリセットは主光源/環境光の色と強度のみ変更し、Directionは維持
 - iOS / AndroidともWeb Share APIを優先して撮影JPEGを共有シートへ渡す
 - Web Share非対応時のみダウンロードへフォールバック
+
+
+## v0.7 DEBUG build
+
+マテリアルの鋭いハイライト原因確認用にDEBUGタブを追加。
+
+VRM読込後に以下を表示します。
+
+- VRM metaVersion
+- マテリアル総数
+- 各マテリアルの name / type / constructor
+- MToon / MeshStandardMaterial / MeshPhysicalMaterial 判定
+- metalness / roughness
+- specularIntensity / specularColor
+- ior / reflectivity / envMapIntensity
+- clearcoat / sheen
+- emissive / opacity / transparent
+- MToonの主要ライティング関連プロパティ
+- そのマテリアルを使用しているMesh名
+- 現在のDirectionalLight / AmbientLightの色とIntensity
+- RendererのtoneMapping等
+
+「コピー」ボタンで結果をクリップボードへコピーできます。
+このDEBUG機能は読み取り専用で、マテリアル値を変更しません。

@@ -27,6 +27,9 @@ const lightDirectionOut = document.querySelector('#lightDirectionOut');
 const focalLengthInput = document.querySelector('#focalLength');
 const focalLengthOut = document.querySelector('#focalLengthOut');
 const focalPresetButtons = [...document.querySelectorAll('.focal-preset')];
+const debugOutput = document.querySelector('#debugOutput');
+const refreshDebugButton = document.querySelector('#refreshDebug');
+const copyDebugButton = document.querySelector('#copyDebug');
 
 const inputs = {
   scale: document.querySelector('#scale'),
@@ -314,6 +317,174 @@ async function startCamera() {
   }
 }
 
+
+function formatDebugValue(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Number(value.toFixed(5)) : String(value);
+  }
+
+  if (typeof value === 'boolean' || typeof value === 'string') {
+    return value;
+  }
+
+  if (value?.isColor && typeof value.getHexString === 'function') {
+    return `#${value.getHexString()}`;
+  }
+
+  if (value?.isTexture) {
+    return {
+      texture: true,
+      name: value.name || '',
+      colorSpace: value.colorSpace ?? null,
+    };
+  }
+
+  if (value?.isVector2 || value?.isVector3 || value?.isVector4) {
+    const result = {};
+    if ('x' in value) result.x = formatDebugValue(value.x);
+    if ('y' in value) result.y = formatDebugValue(value.y);
+    if ('z' in value) result.z = formatDebugValue(value.z);
+    if ('w' in value) result.w = formatDebugValue(value.w);
+    return result;
+  }
+
+  return String(value);
+}
+
+function collectMaterialDebug(material, index, meshes) {
+  const candidateKeys = [
+    'metalness',
+    'roughness',
+    'specularIntensity',
+    'specularColor',
+    'ior',
+    'reflectivity',
+    'envMapIntensity',
+    'clearcoat',
+    'clearcoatRoughness',
+    'sheen',
+    'sheenRoughness',
+    'emissive',
+    'emissiveIntensity',
+    'opacity',
+    'transparent',
+    'alphaTest',
+    'depthWrite',
+    'side',
+    'shadeColorFactor',
+    'shadingShiftFactor',
+    'shadingToonyFactor',
+    'giEqualizationFactor',
+    'matcapFactor',
+    'parametricRimColorFactor',
+    'parametricRimFresnelPowerFactor',
+    'parametricRimLiftFactor',
+    'rimLightingMixFactor',
+    'outlineWidthFactor',
+    'outlineLightingMixFactor',
+  ];
+
+  const properties = {};
+  for (const key of candidateKeys) {
+    if (key in material) {
+      properties[key] = formatDebugValue(material[key]);
+    }
+  }
+
+  return {
+    index,
+    name: material.name || '(unnamed)',
+    type: material.type || material.constructor?.name || '(unknown)',
+    constructor: material.constructor?.name || '(unknown)',
+    isMToonMaterial: Boolean(material.isMToonMaterial),
+    isMeshStandardMaterial: Boolean(material.isMeshStandardMaterial),
+    isMeshPhysicalMaterial: Boolean(material.isMeshPhysicalMaterial),
+    shaderName: material.userData?.shaderName ?? null,
+    meshes,
+    properties,
+  };
+}
+
+function buildMaterialDebugReport(vrm = currentVrm) {
+  if (!vrm?.scene) {
+    return 'VRMを読み込むとマテリアル情報が表示されます。';
+  }
+
+  const materialMap = new Map();
+
+  vrm.scene.traverse((object) => {
+    if (!object.isMesh && !object.isSkinnedMesh) return;
+
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+
+    for (const material of materials) {
+      if (!material) continue;
+
+      if (!materialMap.has(material)) {
+        materialMap.set(material, []);
+      }
+
+      materialMap.get(material).push(object.name || '(unnamed mesh)');
+    }
+  });
+
+  const materials = [...materialMap.entries()].map(
+    ([material, meshes], index) => collectMaterialDebug(material, index, meshes)
+  );
+
+  const metaVersion =
+    vrm.meta?.metaVersion ??
+    vrm.meta?.version ??
+    '(unknown)';
+
+  const report = {
+    NuiRMDebug: 1,
+    vrm: {
+      metaVersion,
+      materialCount: materials.length,
+    },
+    renderer: {
+      outputColorSpace: renderer.outputColorSpace,
+      toneMapping: renderer.toneMapping,
+      toneMappingExposure: renderer.toneMappingExposure,
+    },
+    lighting: {
+      directional: {
+        intensity: keyLight.intensity,
+        color: `#${keyLight.color.getHexString()}`,
+      },
+      ambient: {
+        intensity: ambientLight.intensity,
+        color: `#${ambientLight.color.getHexString()}`,
+      },
+    },
+    materials,
+  };
+
+  return JSON.stringify(report, null, 2);
+}
+
+function refreshMaterialDebug() {
+  debugOutput.textContent = buildMaterialDebugReport();
+}
+
+async function copyMaterialDebug() {
+  const text = debugOutput.textContent || buildMaterialDebugReport();
+
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('DEBUG情報をコピーしました。');
+  } catch (error) {
+    console.error(error);
+    setStatus('コピーできませんでした。DEBUG欄を長押しして選択してください。');
+  }
+}
+
 async function loadVrm(file) {
   if (!file) return;
 
@@ -324,6 +495,7 @@ async function loadVrm(file) {
       scene.remove(currentVrm.scene);
       VRMUtils.deepDispose(currentVrm.scene);
       currentVrm = null;
+      debugOutput.textContent = 'VRMを読み込むとマテリアル情報が表示されます。';
     }
 
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -350,6 +522,7 @@ async function loadVrm(file) {
     poseMirrored = false;
     applyPose();
     resetTransform();
+    refreshMaterialDebug();
 
     setStatus('VRM読込完了');
   } catch (error) {
@@ -727,6 +900,8 @@ mirrorButton.addEventListener('click', () => {
 
 cameraButton.addEventListener('click', startCamera);
 vrmFile.addEventListener('change', () => loadVrm(vrmFile.files?.[0]));
+refreshDebugButton.addEventListener('click', refreshMaterialDebug);
+copyDebugButton.addEventListener('click', copyMaterialDebug);
 
 resetButton.addEventListener('click', () => {
   resetTransform();
