@@ -1026,3 +1026,22 @@ document.getElementById('backgroundImageInput')?.addEventListener('change', (eve
 });
 updateBackgroundSourceUi();
 updateBackgroundPreview();
+
+
+document.querySelectorAll('.tabbar .tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    if (!name) return;
+
+    document.querySelectorAll('.tabbar .tab').forEach((t) => {
+      t.classList.toggle('active', t === tab);
+    });
+
+    document.querySelectorAll('[data-panel], .tab-panel, .panel').forEach((panel) => {
+      const isTarget =
+        panel.dataset?.panel === name ||
+        panel.id === `${name}Panel`;
+      panel.classList.toggle('active', isTarget);
+    });
+  });
+});

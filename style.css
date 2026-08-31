@@ -112,7 +112,7 @@ button, input {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -362,4 +362,66 @@ output {
 .background-image-button {
   width: 100%;
   margin-top: 8px;
+}
+
+
+/* Mobile-friendly range controls */
+input[type="range"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 0;
+  margin: 2px 0;
+  background: transparent;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -10px;
+  border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+input[type="range"]:focus-visible {
+  outline-offset: 2px;
+}
+
+/* Settings reset */
+.reset-section {
+  margin-top: 18px;
+}
+
+.reset-divider {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  margin: 18px 0 14px;
+}
+
+.danger-button.settings-reset-button {
+  width: 100%;
+  border-color: #d65a5a;
+  background: #8f2f2f;
+  color: #ffffff;
+}
+
+.danger-button.settings-reset-button:active {
+  background: #6f2424;
 }

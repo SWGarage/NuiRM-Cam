@@ -255,3 +255,13 @@ The VRM rendering canvas and existing pose/expression/lighting/focal-length beha
 - Preview uses CSS `object-fit: cover`.
 - Capture uses the same centered cover crop via `drawCoverImage()`.
 - Selected image remains loaded when switching back to Camera.
+
+
+## v0.10 UI refine
+
+- Added a new `詳細設定` tab.
+- Moved `Focal Length` and `Background` from `調整` to `詳細設定`.
+- `Scale` is placed below the Rotate controls.
+- Range sliders use larger mobile-friendly touch targets and 28px thumbs.
+- Reset is moved to the bottom of `詳細設定`, separated by a horizontal divider.
+- Reset label changed to `設定のリセット` and uses a distinct danger color.
