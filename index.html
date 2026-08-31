@@ -59,16 +59,33 @@
         <label>Rotate Z <output id="rotZOut">0°</output>
           <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" dir="rtl" />
         </label>
+
+        <div class="adjust-section">
+          <div class="direction-heading">
+            <span>Focal Length</span>
+            <output id="focalLengthOut">24mm</output>
+          </div>
+          <input id="focalLength" type="range" min="24" max="70" step="1" value="24" />
+          <div class="preset-row focal-presets">
+            <button class="button focal-preset active" data-focal="24" type="button">24mm</button>
+            <button class="button focal-preset" data-focal="28" type="button">28mm</button>
+            <button class="button focal-preset" data-focal="35" type="button">35mm</button>
+            <button class="button focal-preset" data-focal="50" type="button">50mm</button>
+          </div>
+          <p class="hint">35mm判換算。24mmをスマホ1x相当の基準値として使用します。</p>
+        </div>
+
         <p class="hint">アバターはプレビュー上を1本指でドラッグしてX/Y移動できます。</p>
       </div>
 
       <div id="posePanel" class="panel">
-        <div class="button-grid">
-          <button class="button pose-button active" data-pose="neutral" type="button">基本</button>
-          <button class="button pose-button" data-pose="wave" type="button">片手上げ</button>
+        <div id="poseList" class="button-grid">
+          <span class="muted">poses.json を読み込んでいます。</span>
+        </div>
+        <div class="button-grid pose-actions">
           <button id="mirrorPose" class="button" type="button">左右反転</button>
         </div>
-        <p class="hint">MVPでは2ポーズのみ。追加ポーズはデータ化して増やせる構造です。</p>
+        <p class="hint">ポーズはルート直下の poses.json から自動生成されます。</p>
       </div>
 
       <div id="facePanel" class="panel">
@@ -79,6 +96,14 @@
 
 
       <div id="lightPanel" class="panel">
+        <div class="light-section">
+          <h2>Preset</h2>
+          <div id="lightPresetList" class="button-grid">
+            <span class="muted">lights.json を読み込んでいます。</span>
+          </div>
+          <p class="hint">プリセットは色と強度のみ変更し、光源方向は維持します。</p>
+        </div>
+
         <div class="light-section">
           <h2>主光源</h2>
           <label class="color-row">Color

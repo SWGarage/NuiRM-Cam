@@ -105,3 +105,54 @@ MVPなので、VRMごとのボーン構成・初期姿勢・モデルサイズ�
 - 環境光の色・強度を追加
 - UnrealBloomPassによるGlowを追加
 - 背景はHTML video、BloomはThree.js側だけで行うためGlow対象はVRMのみ
+
+
+## v0.5変更点
+
+- `UnrealBloomPass` を廃止し、カメラ映像とGlow処理を完全分離
+- 通常VRM Canvasとは別にGlow専用透明Canvasを追加
+- GlowはVRMのみに適用し、カメラ映像を覆わない構成へ変更
+- 撮影画像にもVRM専用Glowを合成
+- Glow Strength初期値を `0.10` に変更
+- 主光源Y方向の操作範囲を `-180°〜180°` に変更
+
+
+## v0.6変更点
+
+- Rotate Zスライダーの操作方向を反転
+  - 左端 `180°`
+  - 中央 `0°`
+  - 右端 `-180°`
+- Glow機能を一時凍結し、UI・専用Canvas・レンダラー・撮影合成・関連状態を削除
+- LIGHTタブは主光源と環境光のみ維持
+- 描画構成を `camera video + VRM transparent canvas` に簡略化
+
+
+## v0.7変更点
+
+- Focal Length機能を追加
+  - 24–70mm
+  - 初期値 24mm
+  - 24 / 28 / 35 / 50mm クイックプリセット
+  - 35mm判換算の操作値としてThree.js PerspectiveCameraへ反映
+- リセット時は24mmへ戻る
+- iPhone/iPadの撮影後保存を改善
+  - 対応環境ではWeb Share APIでJPEGをiOS共有シートへ渡す
+  - 「画像を保存」を選択すると写真ライブラリへ保存できる
+  - 利用できない環境では従来のダウンロード方式へフォールバック
+
+
+## v0.7 統合更新
+
+- VRM 0.x / 1.x の差異について、以下は現状処理を維持
+  - モデル正面方向 / Rotate Y=180°
+  - poses.json Quaternion → Normalized Bone
+  - Expression一覧取得
+  - MToon等のマテリアル表示
+  - SpringBone
+  - VRMロード後の初期スケール・位置
+- `poses.json` をルート直下から読み込み、ポーズUIを自動生成
+- `lights.json` をルート直下から読み込み、日中/夕方/夜/室内プリセットを自動生成
+- ライティングプリセットは主光源/環境光の色と強度のみ変更し、Directionは維持
+- iOS / AndroidともWeb Share APIを優先して撮影JPEGを共有シートへ渡す
+- Web Share非対応時のみダウンロードへフォールバック

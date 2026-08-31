@@ -12,6 +12,8 @@ const captureButton = document.querySelector('#captureButton');
 const resetButton = document.querySelector('#resetButton');
 const captureCanvas = document.querySelector('#captureCanvas');
 const expressionList = document.querySelector('#expressionList');
+const poseList = document.querySelector('#poseList');
+const lightPresetList = document.querySelector('#lightPresetList');
 const mirrorButton = document.querySelector('#mirrorPose');
 const keyLightColorInput = document.querySelector('#keyLightColor');
 const keyLightIntensityInput = document.querySelector('#keyLightIntensity');
@@ -22,6 +24,9 @@ const ambientLightIntensityOut = document.querySelector('#ambientLightIntensityO
 const lightDirectionPad = document.querySelector('#lightDirectionPad');
 const lightDirectionDot = document.querySelector('#lightDirectionDot');
 const lightDirectionOut = document.querySelector('#lightDirectionOut');
+const focalLengthInput = document.querySelector('#focalLength');
+const focalLengthOut = document.querySelector('#focalLengthOut');
+const focalPresetButtons = [...document.querySelectorAll('.focal-preset')];
 
 const inputs = {
   scale: document.querySelector('#scale'),
@@ -48,7 +53,13 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+
+const cameraSettings = {
+  focalLength: 24,
+};
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.filmGauge = 35;
 camera.position.set(0, 1.0, 5.0);
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
@@ -69,6 +80,8 @@ let stream = null;
 let currentVrm = null;
 let objectUrl = null;
 let currentPose = 'neutral';
+let posePresets = [];
+let lightPresets = [];
 let poseMirrored = false;
 let drag = null;
 const activePointers = new Map();
@@ -104,6 +117,27 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function applyFocalLength() {
+  cameraSettings.focalLength = THREE.MathUtils.clamp(
+    Number(cameraSettings.focalLength) || 24,
+    24,
+    70
+  );
+
+  camera.setFocalLength(cameraSettings.focalLength);
+  camera.updateProjectionMatrix();
+
+  focalLengthInput.value = String(cameraSettings.focalLength);
+  focalLengthOut.value = `${Math.round(cameraSettings.focalLength)}mm`;
+
+  focalPresetButtons.forEach((button) => {
+    button.classList.toggle(
+      'active',
+      Number(button.dataset.focal) === cameraSettings.focalLength
+    );
+  });
+}
+
 function resizeRenderer() {
   const rect = stage.getBoundingClientRect();
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -112,7 +146,7 @@ function resizeRenderer() {
   renderer.setSize(rect.width, rect.height, false);
 
   camera.aspect = rect.width / rect.height;
-  camera.updateProjectionMatrix();
+  applyFocalLength();
 }
 
 function applyTransform() {
@@ -201,6 +235,54 @@ function syncLightingUi() {
   ambientLightIntensityOut.value = lighting.ambientIntensity.toFixed(2);
   updateLightDirection();
 }
+
+function buildLightPresetButtons() {
+  lightPresetList.innerHTML = '';
+
+  if (!lightPresets.length) {
+    lightPresetList.innerHTML = '<span class="muted">lights.json にプリセットがありません。</span>';
+    return;
+  }
+
+  for (const preset of lightPresets) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button light-preset-button';
+    button.dataset.lightPreset = preset.id;
+    button.textContent = preset.name ?? preset.id;
+    button.addEventListener('click', () => {
+      lighting.keyColor = preset.keyColor ?? lighting.keyColor;
+      lighting.keyIntensity = Number(preset.keyIntensity ?? lighting.keyIntensity);
+      lighting.ambientColor = preset.ambientColor ?? lighting.ambientColor;
+      lighting.ambientIntensity = Number(preset.ambientIntensity ?? lighting.ambientIntensity);
+
+      syncLightingUi();
+      applyLighting();
+
+      lightPresetList.querySelectorAll('.light-preset-button').forEach((b) => {
+        b.classList.toggle('active', b === button);
+      });
+    });
+    lightPresetList.appendChild(button);
+  }
+}
+
+async function loadLightPresets() {
+  try {
+    const response = await fetch('./lights.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    lightPresets = Array.isArray(data.presets) ? data.presets : [];
+    buildLightPresetButtons();
+
+    const daylightButton = lightPresetList.querySelector('[data-light-preset="daylight"]');
+    if (daylightButton) daylightButton.classList.add('active');
+  } catch (error) {
+    console.error('lights.json load failed:', error);
+    lightPresetList.innerHTML = '<span class="muted">lights.json を読み込めませんでした。</span>';
+  }
+}
+
 
 async function startCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -297,27 +379,37 @@ function getBone(name) {
   return currentVrm?.humanoid?.getNormalizedBoneNode(name) ?? null;
 }
 
+const poseBoneNames = [
+  'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+  'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+  'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
+  'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'leftToes',
+  'rightUpperLeg', 'rightLowerLeg', 'rightFoot', 'rightToes',
+];
+
 function resetPoseBones() {
   if (!currentVrm?.humanoid) return;
 
-  const boneNames = [
-    'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
-    'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
-    'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
-    'leftUpperLeg', 'leftLowerLeg', 'leftFoot',
-    'rightUpperLeg', 'rightLowerLeg', 'rightFoot',
-  ];
-
-  for (const name of boneNames) {
+  for (const name of poseBoneNames) {
     const bone = getBone(name);
-    if (bone) bone.rotation.set(0, 0, 0);
+    if (bone) bone.quaternion.identity();
   }
 }
 
-function setBoneRotation(name, x = 0, y = 0, z = 0) {
-  const bone = getBone(name);
-  if (!bone) return;
-  bone.rotation.set(x, y, z);
+function mirroredBoneName(name) {
+  if (name.startsWith('left')) return `right${name.slice(4)}`;
+  if (name.startsWith('right')) return `left${name.slice(5)}`;
+  return name;
+}
+
+function mirroredQuaternion(rotation) {
+  // 左右反転（YZ平面で鏡映）を回転Quaternionへ変換。
+  return {
+    x: rotation.x,
+    y: -rotation.y,
+    z: -rotation.z,
+    w: rotation.w,
+  };
 }
 
 function applyPose() {
@@ -325,14 +417,67 @@ function applyPose() {
 
   resetPoseBones();
 
-  if (currentPose === 'wave') {
-    const side = poseMirrored ? 'right' : 'left';
-    const upperArm = `${side}UpperArm`;
-    const lowerArm = `${side}LowerArm`;
-    const sign = poseMirrored ? -1 : 1;
+  const pose = posePresets.find((item) => item.id === currentPose);
+  if (!pose) return;
 
-    setBoneRotation(upperArm, 0.05, 0.0, sign * 1.0);
-    setBoneRotation(lowerArm, 0.0, sign * 0.15, sign * 1.1);
+  for (const item of pose.bones ?? []) {
+    const sourceRotation = item.rotation;
+    if (!sourceRotation) continue;
+
+    const boneName = poseMirrored ? mirroredBoneName(item.bone) : item.bone;
+    const rotation = poseMirrored ? mirroredQuaternion(sourceRotation) : sourceRotation;
+    const bone = getBone(boneName);
+    if (!bone) continue;
+
+    bone.quaternion.set(
+      Number(rotation.x) || 0,
+      Number(rotation.y) || 0,
+      Number(rotation.z) || 0,
+      Number(rotation.w) || 1
+    ).normalize();
+  }
+}
+
+function buildPoseButtons() {
+  poseList.innerHTML = '';
+
+  if (!posePresets.length) {
+    poseList.innerHTML = '<span class="muted">poses.json にポーズがありません。</span>';
+    return;
+  }
+
+  for (const pose of posePresets) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button pose-button';
+    button.dataset.pose = pose.id;
+    button.textContent = pose.name ?? pose.id;
+    button.classList.toggle('active', pose.id === currentPose);
+    button.addEventListener('click', () => {
+      currentPose = pose.id;
+      poseList.querySelectorAll('.pose-button').forEach((b) => {
+        b.classList.toggle('active', b === button);
+      });
+      applyPose();
+    });
+    poseList.appendChild(button);
+  }
+}
+
+async function loadPosePresets() {
+  try {
+    const response = await fetch('./poses.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    posePresets = Array.isArray(data.poses) ? data.poses : [];
+    currentPose = posePresets.some((pose) => pose.id === 'neutral')
+      ? 'neutral'
+      : (posePresets[0]?.id ?? 'neutral');
+    buildPoseButtons();
+    applyPose();
+  } catch (error) {
+    console.error('poses.json load failed:', error);
+    poseList.innerHTML = '<span class="muted">poses.json を読み込めませんでした。</span>';
   }
 }
 
@@ -421,6 +566,19 @@ for (const [key, input] of Object.entries(inputs)) {
     applyTransform();
   });
 }
+
+
+focalLengthInput.addEventListener('input', () => {
+  cameraSettings.focalLength = Number(focalLengthInput.value);
+  applyFocalLength();
+});
+
+focalPresetButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    cameraSettings.focalLength = Number(button.dataset.focal);
+    applyFocalLength();
+  });
+});
 
 
 keyLightColorInput.addEventListener('input', () => {
@@ -560,15 +718,6 @@ document.querySelectorAll('.tab').forEach((tab) => {
   });
 });
 
-document.querySelectorAll('.pose-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    currentPose = button.dataset.pose;
-    document.querySelectorAll('.pose-button').forEach((b) => {
-      b.classList.toggle('active', b === button);
-    });
-    applyPose();
-  });
-});
 
 mirrorButton.addEventListener('click', () => {
   poseMirrored = !poseMirrored;
@@ -581,11 +730,13 @@ vrmFile.addEventListener('change', () => loadVrm(vrmFile.files?.[0]));
 
 resetButton.addEventListener('click', () => {
   resetTransform();
+  cameraSettings.focalLength = 24;
+  applyFocalLength();
   currentPose = 'neutral';
   poseMirrored = false;
   mirrorButton.classList.remove('active');
 
-  document.querySelectorAll('.pose-button').forEach((button) => {
+  poseList.querySelectorAll('.pose-button').forEach((button) => {
     button.classList.toggle('active', button.dataset.pose === 'neutral');
   });
 
@@ -601,14 +752,46 @@ resetButton.addEventListener('click', () => {
 
 captureButton.addEventListener('click', capturePhoto);
 
-async function capturePhoto() {
+function makeFilename() {
+  const now = new Date();
+  const pad2 = (value) => String(value).padStart(2, '0');
+  const stamp =
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-` +
+    `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+
+  return `NuiRM-${stamp}.jpg`;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, payload] = dataUrl.split(',');
+  const mimeMatch = header.match(/data:([^;]+)/);
+  const mime = mimeMatch?.[1] || 'image/jpeg';
+  const bytes = atob(payload);
+  const array = new Uint8Array(bytes.length);
+
+  for (let i = 0; i < bytes.length; i += 1) {
+    array[i] = bytes.charCodeAt(i);
+  }
+
+  return new Blob([array], { type: mime });
+}
+
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function capturePhoto() {
   if (!video.videoWidth || !video.videoHeight) {
     setStatus('先にカメラを開始してください。');
     return;
   }
 
-  // 保存画像はプレビュー(stage)と同じアスペクト比に固定する。
-  // 長辺の解像度は元カメラを超えない範囲で決める。
   const stageRatio = stage.clientWidth / stage.clientHeight;
   const videoW = video.videoWidth;
   const videoH = video.videoHeight;
@@ -646,29 +829,36 @@ async function capturePhoto() {
   renderer.render(scene, camera);
   ctx.drawImage(renderer.domElement, 0, 0, outW, outH);
 
-  const blob = await new Promise((resolve) =>
-    captureCanvas.toBlob(resolve, 'image/jpeg', 0.92)
-  );
+  // Web Share APIはユーザー操作が必要なため、JPEG生成を同期処理にする。
+  const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.92);
+  const blob = dataUrlToBlob(dataUrl);
+  const filename = makeFilename();
 
-  if (!blob) {
-    setStatus('画像生成に失敗しました。');
-    return;
+  if (navigator.share && navigator.canShare) {
+    const file = new File([blob], filename, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+
+    if (navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] })
+        .then(() => {
+          setStatus(`写真を共有しました（${outW}×${outH}）`);
+        })
+        .catch((error) => {
+          if (error?.name === 'AbortError') {
+            setStatus('保存をキャンセルしました。');
+          } else {
+            console.error(error);
+            setStatus('共有に失敗したため、ファイルとして保存します。');
+            downloadBlob(blob, filename);
+          }
+        });
+      return;
+    }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-
-  const now = new Date();
-  const pad2 = (value) => String(value).padStart(2, '0');
-  const stamp =
-    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-` +
-    `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
-
-  a.href = url;
-  a.download = `NuiRM-${stamp}.jpg`;
-  a.click();
-
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, filename);
   setStatus(`写真を書き出しました（${outW}×${outH}）`);
 }
 
@@ -676,5 +866,8 @@ const resizeObserver = new ResizeObserver(resizeRenderer);
 resizeObserver.observe(stage);
 resizeRenderer();
 syncTransformUi();
+applyFocalLength();
 syncLightingUi();
 applyLighting();
+loadPosePresets();
+loadLightPresets();

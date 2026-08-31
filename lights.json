@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "daylight",
+      "name": "日中",
+      "keyColor": "#ffffff",
+      "keyIntensity": 2.5,
+      "ambientColor": "#ffffff",
+      "ambientIntensity": 1.3
+    },
+    {
+      "id": "sunset",
+      "name": "夕方",
+      "keyColor": "#ffd080",
+      "keyIntensity": 2.2,
+      "ambientColor": "#c85c55",
+      "ambientIntensity": 0.4
+    },
+    {
+      "id": "night",
+      "name": "夜",
+      "keyColor": "#8eb8ff",
+      "keyIntensity": 1.3,
+      "ambientColor": "#26334f",
+      "ambientIntensity": 0.15
+    },
+    {
+      "id": "indoor",
+      "name": "室内",
+      "keyColor": "#fff2d6",
+      "keyIntensity": 0.8,
+      "ambientColor": "#fff4e5",
+      "ambientIntensity": 1.5
+    }
+  ]
+}

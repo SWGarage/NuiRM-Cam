@@ -295,3 +295,31 @@ output {
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
+
+
+.adjust-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #333;
+}
+
+.adjust-section > input[type="range"] {
+  width: 100%;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.focal-preset {
+  min-height: 38px;
+  padding: 7px 11px;
+}
+
+.focal-preset.active {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
