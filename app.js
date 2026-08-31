@@ -1045,3 +1045,18 @@ document.querySelectorAll('.tabbar .tab').forEach((tab) => {
     });
   });
 });
+
+
+// global-reset-section-handler
+document.querySelectorAll('.settings-reset-button').forEach((button) => {
+  button.addEventListener('click', () => resetTransform());
+});
+
+
+// pose-basic-fixed-handler
+document.querySelector('.pose-basic-button')?.addEventListener('click', () => {
+  (() => {
+    const p = (poseData?.poses ?? poses ?? []).find((x) => x.id === 'neutral' || x.name === '基本');
+    if (p) applyPose(p);
+  })();
+});

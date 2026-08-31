@@ -265,3 +265,15 @@ The VRM rendering canvas and existing pose/expression/lighting/focal-length beha
 - Range sliders use larger mobile-friendly touch targets and 28px thumbs.
 - Reset is moved to the bottom of `詳細設定`, separated by a horizontal divider.
 - Reset label changed to `設定のリセット` and uses a distinct danger color.
+
+
+## v0.11 UI refine
+
+- `設定のリセット` is available at the bottom of every menu tab.
+- Rotate labels:
+  - `上下向き(x)`
+  - `左右向き(y)`
+  - `傾き(z)`
+- Pose top row is fixed to `基本` and `左右反転`.
+- Additional poses are placed from the second row onward.
+- `詳細設定` is placed to the right of `LIGHT`.
